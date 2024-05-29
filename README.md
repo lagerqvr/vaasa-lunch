@@ -1,2 +1,2 @@
 # vaasa-lunch
-Simple frontend for fetching student lunch menus in Arabianranta area.
+Simple frontend for fetching student lunch menus in the Vaasa area.

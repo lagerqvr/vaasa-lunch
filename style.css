@@ -1,0 +1,99 @@
+html,
+body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+h3 {
+    font-size: 2.1rem;
+}
+
+body::-webkit-scrollbar {
+    display: none;
+}
+
+footer {
+    font-size: 12px;
+    flex-shrink: 0;
+    padding: 3px 20px 17.5px 20px;
+    text-align: center;
+}
+
+footer>a:hover,
+footer>a {
+    text-decoration: none;
+}
+
+.currentDate {
+    font-size: calc(1.6rem + 0.5vw);
+    font-weight: 300;
+    vertical-align: middle;
+}
+
+.container {
+    flex: 1 0 auto;
+}
+
+.date-selector {
+    cursor: pointer;
+}
+
+.accordion-body {
+    min-height: 300px;
+}
+
+#alexander-menu,
+#cotton-menu,
+#errorMsg {
+    font-size: 14px;
+}
+
+#errorMsg {
+    width: fit-content;
+}
+
+.menu-link {
+    padding-top: 2px;
+    font-size: calc(0.8rem + 0.3vw);
+}
+
+.openTxt {
+    font-size: calc(1rem + 0.2vw);
+}
+
+@media (max-width: 360px) {
+    .openTxt {
+        font-size: calc(0.9rem + 0.1vw);
+    }
+
+    .menu-link {
+        font-size: calc(0.7rem + 0.3vw);
+    }
+}
+
+@media (min-width: 1600px) {
+    .currentDate {
+        font-size: 1.7rem;
+    }
+}
+
+@keyframes pulseAnimation {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.25);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animated {
+    animation: pulseAnimation 0.4s ease;
+}
