@@ -66,10 +66,8 @@ const setLanguage = () => {
             localStorage.setItem('selected-language', lang);
 
             // Reload all menus
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3003&language=${lang}`, 'alexander-menu');
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3104&language=${lang}`, 'cotton-menu');
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=1256&language=${lang}`, 'artebia-menu');
-            fetchChemicumLunch();
+            fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
+            fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu');
         });
     });
 };
@@ -192,10 +190,8 @@ async function changeDay(delta) {
 
         // Await for all fetches to complete
         await Promise.all([
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3003&language=${chosenLang}`, 'alexander-menu'),
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3104&language=${chosenLang}`, 'cotton-menu'),
-            fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=1256&language=${chosenLang}`, 'artebia-menu'),
-            fetchChemicumLunch()
+            fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu'),
+            fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu')
         ]);
     } catch (error) {
         outputError(error.message + ` (${error.stack})`);
@@ -222,8 +218,30 @@ const outputError = (input) => {
 
 let fullURL;
 
+function getLunchTime(html, dayOfWeek, divName) {
+    let regex;
+    if (divName == 'alexander-menu') {
+        regex = /Lunch:\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})/;
+    } else {
+        regex = /Lounas kello \s*(\d{2}:\d{2}\s*-\s*\d{2})/
+
+    }
+    const match = html.match(regex);
+    console.log(match);
+    if (match) {
+        const weekLunchTime = match[1];
+        const fridayLunchTime = match[2];
+        if (dayOfWeek >= 1 && dayOfWeek <= 4) { // Monday to Thursday
+            return weekLunchTime;
+        } else if (dayOfWeek === 5) { // Friday
+            return fridayLunchTime;
+        }
+    }
+    return " - "; // Default if no match found
+}
+
 // Function to fetch and display the lunch for the specific day from Arcada, Diak and Artebia 135
-async function fetchLunchMajority(URL, divId) {
+async function fetchLunch(URL, divId) {
     try {
         // Get the div where you want to display the data and the user's preferred language
         const lang = localStorage.getItem('selected-language');
@@ -242,17 +260,17 @@ async function fetchLunchMajority(URL, divId) {
         const proxyURL = 'https://corsproxy.io/?'
         fullURL = proxyURL + URL;
 
-        if (divId === 'artebia-menu' && localStorage.getItem('selected-language') === 'sv-FI') {
-            fullURL = proxyURL + `https://www.compass-group.fi/menuapi/feed/json?costNumber=1256&language=en`;
-        };
-
         // Fetch the JSON content
         const response = await fetch(fullURL, {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'text/html; charset=utf-8',
             },
         });
+
+        // Fetch HTML data
+        const data = await response.text();
+        console.log(data);
 
         // Check the status code
         if (response.status === 524) {
@@ -265,9 +283,6 @@ async function fetchLunchMajority(URL, divId) {
             }
             return;
         }
-
-        // Convert the response to JSON
-        const data = await response.json();
 
         // Get reminder notes div
         const reminderNotes = document.querySelectorAll('.lang-reminder');
@@ -313,35 +328,55 @@ async function fetchLunchMajority(URL, divId) {
         const originalDate = new Date(originalDateString);
 
         // Getting the date components in local time
-        const yyyy = originalDate.getFullYear();
-        const mm = String(originalDate.getMonth() + 1).padStart(2, '0');  // Months are zero-based
-        const dd = String(originalDate.getDate()).padStart(2, '0');
+        const mm = String(originalDate.getMonth() + 1);  // Months are zero-based
+        const dd = String(originalDate.getDate());
 
-        // Constructing the new ISO 8601 string in UTC
-        const isoDate = `${yyyy}-${mm}-${dd}T00:00:00+00:00`;
+        // Constructing the new date string
+        const dateFormatted = `${dd}.${mm}`;
 
-        // Find today's lunch menu
-        let todayMenu = data.MenusForDays.find(dayMenu => dayMenu.Date === isoDate);
+        // Extract lunch time from HTML string
+        let htmlString;
+        let divName;
+        if (lunchDiv.id == 'alexander-menu') {
+            divName = "alexander-menu"
+            htmlString = "Lunch: ";
+        } else {
+            htmlString = "Lounas kello ";
+        }
+        const dayOfWeek = today.getDay();
+        const lunchTime = getLunchTime(htmlString, dayOfWeek, divName);
+
+        // Create a regex to find today's date and its associated menu
+        let match;
+        if (lunchDiv.id == 'alexander-menu') {
+            const regex = new RegExp(`<div class="lunch-menu__day[^>]*>\\s*<span class="day-toggle"></span><h2 class="collapsible-title">[^<]*${dateFormatted}[^<]*</h2>\\s*<p>(.*?)</p>`, 's');
+            match = data.match(regex);
+        } else {
+            const regex = new RegExp(`<div class="item-header"><h3>[^<]*${dateFormatted}[^<]*</h3></div><div class="item-body"><ul>(.*?)</ul></div><div class="item-footer">`, 's');
+            match = data.match(regex);
+        }
+
+        console.log(match);
 
         // Find current weekday
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const day = daysOfWeek[currentDate.getDay()];
         const isWeekend = (day === 'Sat' || day === 'Sun');
 
-        if (todayMenu && todayMenu.SetMenus && !isWeekend) {
-            const lunchTime = document.createElement('div');
+        if (match && match[1] && !isWeekend) {
+            const lunchTimeElement = document.createElement('div');
             switch (lunchDiv.id) {
                 case 'alexander-menu':
-                    lunchTime.innerHTML = `<div class="row d-flex justify-content-between">
+                    lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
             <div class="col-8">
                 <p class="openTxt"><b>${openTxt}</b><span
                         class="text-success"> 
-                        ${todayMenu.LunchTime === null ? " - " : todayMenu.LunchTime}</span>
+                        ${lunchTime}</span>
                 </p>
             </div>
             <div class="col-4 d-flex justify-content-end">
                 <a style="text-decoration: none;" class="text-primary-emphasis menu-link"
-                    href="https://www.compass-group.fi/ravintolat-ja-ruokalistat/foodco/kaupungit/helsinki/arcada/">${menuLinkTxt}
+                    href="https://abo-academi.ravintolapalvelut.iss.fi/abo-academi">${menuLinkTxt}
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
                         fill="currentColor"
                         class="bi bi-box-arrow-up-right mb-1 ml-1"
@@ -356,40 +391,16 @@ async function fetchLunchMajority(URL, divId) {
         </div>`;
                     break;
                 case 'cotton-menu':
-                    lunchTime.innerHTML = `<div class="row d-flex justify-content-between">
+                    lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
             <div class="col-8">
                 <p class="openTxt"><b>${openTxt}</b><span
                         class="text-success"> 
-                        ${todayMenu.LunchTime === null ? " - " : todayMenu.LunchTime}</span>
+                        ${lunchTime}</span>
                 </p>
             </div>
             <div class="col-4 d-flex justify-content-end">
                 <a style="text-decoration: none;" class="text-primary-emphasis menu-link"
-                    href="https://www.compass-group.fi/ravintolat-ja-ruokalistat/foodco/kaupungit/helsinki/diak-kalasatama/">${menuLinkTxt}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                        fill="currentColor"
-                        class="bi bi-box-arrow-up-right mb-1 ml-1"
-                        viewBox="0 0 16 16">
-                        <path fill-rule="evenodd"
-                            d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
-                        <path fill-rule="evenodd"
-                            d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
-                    </svg>
-                </a>
-            </div>
-        </div>`;
-                    break;
-                case 'artebia-menu':
-                    lunchTime.innerHTML = `<div class="row d-flex justify-content-between">
-            <div class="col-8">
-                <p class="openTxt"><b>${openTxt}</b><span
-                        class="text-success"> 
-                        ${todayMenu.LunchTime === null ? " - " : todayMenu.LunchTime}</span>
-                </p>
-            </div>
-            <div class="col-4 d-flex justify-content-end">
-                <a style="text-decoration: none;" class="text-primary-emphasis menu-link"
-                    href="https://www.compass-group.fi/ravintolat-ja-ruokalistat/foodco/kaupungit/helsinki/arabianranta/">${menuLinkTxt}
+                    href="https://www.lounaat.info/lounas/cotton-club/vaasa">${menuLinkTxt}
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
                         fill="currentColor"
                         class="bi bi-box-arrow-up-right mb-1 ml-1"
@@ -404,34 +415,33 @@ async function fetchLunchMajority(URL, divId) {
         </div>`;
                     break;
             }
-            lunchDiv.appendChild(lunchTime);
-            if (divId === 'artebia-menu') {
-                // Remove first two items from the array
-                todayMenu.SetMenus.shift();
-                todayMenu.SetMenus.shift();
-            }
-            for (const menu of todayMenu.SetMenus) {
-                if (menu.Name === null) {
-                    menu.Name = 'Lunch';
-                }
-
-                if (divId === 'cotton-menu') {
-                    const originalName = menu.Name.trim();
-                    let firstChar = originalName.charAt(0);
-
-                    // Check if the first character is a number
-                    if (!isNaN(firstChar)) {
-                        menu.Name = "Lunch";
-                    } else {
-                        const cleanedName = originalName.replace(/ [\d,/. €]+/g, '');
-                        menu.Name = cleanedName;
-                    }
-                }
+            lunchDiv.appendChild(lunchTimeElement);
+            if (lunchDiv.id == 'alexander-menu') {
                 const menuParagraph = document.createElement('p');
-                const components = menu.Components.join(', ');
 
-                menuParagraph.innerHTML = `<b>${menu.Name}:</b> ${components}`;
+                // Split, trim and filter the menu items
+                const menuItems = match[1].split('<br>').map(item => item.trim()).filter(item => item && !item.includes('Sale of leftover food'));
 
+                // Capitalize the first letter after every comma
+                const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+                const formattedMenuItems = menuItems.map(item =>
+                    item.split(',').map(capitalizeFirstLetter).join(', ')
+                );
+                menuParagraph.innerHTML = "<b>Lunch/lounas</b>: " + formattedMenuItems;
+                lunchDiv.appendChild(menuParagraph);
+            } else {
+                const menuParagraph = document.createElement('p');
+
+                const formattedMenuItems = [];
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(match[1], 'text/html');
+                doc.querySelectorAll('li .dish').forEach(dishElement => {
+                    // Extract the text content and remove the price
+                    let dishText = dishElement.textContent.replace(/\d+,\d+ \/ \d+,\d+e/g, '').trim();
+                    dishText = dishText.split(',').map(word => word.trim()).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(', ');
+                    formattedMenuItems.push(dishText);
+                });
+                menuParagraph.innerHTML = "<b>Lunch/lounas</b>: " + formattedMenuItems;
                 lunchDiv.appendChild(menuParagraph);
             }
         } else {
@@ -446,151 +456,6 @@ async function fetchLunchMajority(URL, divId) {
 
     } catch (error) {
         document.getElementById(divId).innerHTML = 'Failed to fetch lunch data.';
-        outputError(error.message + ` (${error.stack})`);
-        console.error('An error occurred:', error);
-    }
-};
-
-// Function to fetch and display the lunch for the specific day from Chemicum
-async function fetchChemicumLunch() {
-    try {
-        // Get the div where you want to display the data and the user's preferred language
-        const currentLang = localStorage.getItem('selected-language') || 'en';
-        const lunchDiv = document.getElementById('chemicum-menu');
-
-        // Set the innerHTML to "Fetching data" before fetching
-        if (currentLang === 'en') {
-            lunchDiv.innerHTML = "<p>Fetching lunch data...</p>";
-        } else if (currentLang === 'sv-FI') {
-            lunchDiv.innerHTML = "<p>Hämtar lunch-data...</p>";
-        } else {
-            lunchDiv.innerHTML = "<p>Noudetaan lounas-dataa...</p>";
-        }
-
-        // Proxy URL to bypass CORS
-        const proxyURL = 'https://corsproxy.io/?'
-        fullURL = proxyURL + `https://unicafe.fi/wp-json/swiss/v1/restaurants?lang=${currentLang}`;
-
-        if (localStorage.getItem('selected-language') === 'sv-FI') {
-            fullURL = proxyURL + `https://unicafe.fi/wp-json/swiss/v1/restaurants?lang=sv`;
-        }
-
-        // Fetch the JSON content
-        const response = await fetch(fullURL, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        });
-
-        // Check the status code
-        if (response.status === 524) {
-            if (currentLang === 'en') {
-                lunchDiv.innerHTML = "Failed to fetch lunch data.";
-            } else if (currentLang === 'sv-FI') {
-                lunchDiv.innerHTML = "Kunde inte hämta lunch data.";
-            } else {
-                lunchDiv.innerHTML = "Lounas-datan noutaminen epäonnistui.";
-            }
-            return;
-        }
-
-        // Convert the response to JSON
-        const data = await response.json();
-
-        // Find Chemicum lunch data
-        const lunchData = data.find(data => data.title === 'Chemicum');
-
-        // Initialize the date when the page loads or read it from localStorage
-        initializeDate();
-
-        // Find today's lunch menu
-        const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const day = daysOfWeek[currentDate.getDay()];
-
-        // Convert currentDate to the format used in lunchData.menuData.menus
-        const todayFormatted = `${currentDate.getDate().toString().padStart(2, '0')}.${(currentDate.getMonth() + 1).toString().padStart(2, '0')}.`;
-
-        // Match today's date with the date in the fetched data
-        const todayMenu = lunchData.menuData.menus.find(menus => menus.date.split(' ')[1] === todayFormatted);
-
-        // Get the updated preferred language
-        let openTxt;
-        let menuLinkTxt;
-
-        const lang = localStorage.getItem('selected-language');
-
-        let storedDateString = localStorage.getItem('currentDate');
-        let storedDate = new Date(storedDateString);
-        let today = new Date();
-
-        // Normalize the Date objects to compare only the date, not the time
-        let isToday = today.toDateString() === storedDate.toDateString();
-
-        if (lang === 'en') {
-            openTxt = isToday ? 'Open today:' : 'Open:';
-            menuLinkTxt = 'Menu link';
-        } else if (lang === 'sv-FI') {
-            openTxt = isToday ? 'Öppet idag:' : 'Öppet:';
-            menuLinkTxt = 'Full meny';
-        } else {
-            openTxt = isToday ? 'Auki tänään:' : 'Avoinna:';
-            menuLinkTxt = 'Menu';
-        }
-
-        // Get the div where you want to display the data
-        lunchDiv.innerHTML = '';
-
-        const isWeekend = (day === 'Sat' || day === 'Sun');
-
-        if (todayMenu && !isWeekend) {
-            const lunchTime = document.createElement('div');
-            lunchTime.innerHTML = `<div class="row d-flex justify-content-between">
-            <div class="col-8">
-                <p class="openTxt"><b>${openTxt}</b><span
-                        class="text-success"> 
-                        ${lunchData.menuData.visitingHours.lounas.items[0].hours === null ? " - " : lunchData.menuData.visitingHours.lounas.items[0].hours}</span>
-                </p>
-            </div>
-            <div class="col-4 d-flex justify-content-end">
-                <a style="text-decoration: none;" class="text-primary-emphasis menu-link"
-                    href="https://unicafe.fi/en/restaurants/chemicum/">${menuLinkTxt}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                        fill="currentColor"
-                        class="bi bi-box-arrow-up-right mb-1 ml-1"
-                        viewBox="0 0 16 16">
-                        <path fill-rule="evenodd"
-                            d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
-                        <path fill-rule="evenodd"
-                            d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
-                    </svg>
-                </a>
-            </div>
-        </div>`;
-            lunchDiv.appendChild(lunchTime);
-            for (const menu of todayMenu.data) {
-                const menuParagraph = document.createElement('p');
-                const components = menu.meta[0].join(', ');
-
-                if (todayMenu.data == null || todayMenu.data == '') {
-                    menuParagraph.innerHTML = 'No lunchlist available';
-                }
-                menuParagraph.innerHTML = `<b>${menu.price.name}: </b>${menu.name}, (${components})`;
-                lunchDiv.appendChild(menuParagraph);
-            }
-        } else {
-            if (lang === 'en') {
-                lunchDiv.innerHTML = '<p>No lunch data available for the selected day.</p>';
-            } else if (lang === 'sv-FI') {
-                lunchDiv.innerHTML = '<p>Ingen lunch-data kunde hämtas för dagen i frågan.</p>';
-            } else {
-                lunchDiv.innerHTML = '<p>Lounas-dataa ei löytynyt kyseiselle päivälle.</p>';
-            }
-        }
-
-
-    } catch (error) {
-        document.getElementById('chemicum-menu').innerHTML = 'Failed to fetch lunch data.';
         outputError(error.message + ` (${error.stack})`);
         console.error('An error occurred:', error);
     }
@@ -632,8 +497,6 @@ const copyLunchToClipboard = () => {
         // Get the menu items from the DOM
         const arcadaMenu = document.getElementById('alexander-menu').innerText;
         const diakMenu = document.getElementById('cotton-menu').innerText;
-        const artebiaMenu = document.getElementById('artebia-menu').innerText;
-        const chemicumMenu = document.getElementById('chemicum-menu').innerText;
 
         // Construct the lunch object
         const lunchObj = `${heading}\n\n${formatMenu(arcadaMenu, "Arcada")}\n\n${formatMenu(diakMenu, "DIAK")}\n\n${formatMenu(artebiaMenu, "Artebia")}\n\n${formatMenu(chemicumMenu, "Chemicum")}`;
@@ -648,19 +511,11 @@ const copyLunchToClipboard = () => {
 };
 
 document.querySelector('#collapseOne').addEventListener('show.bs.collapse', function () {
-    fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3003&language=${localStorage.getItem('selected-language') || 'en'}`, 'alexander-menu');
+    fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
 });
 
 document.querySelector('#collapseTwo').addEventListener('show.bs.collapse', function () {
-    fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3104&language=${localStorage.getItem('selected-language') || 'en'}`, 'cotton-menu');
-});
-
-document.querySelector('#collapseThree').addEventListener('show.bs.collapse', function () {
-    fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=1256&language=${localStorage.getItem('selected-language') || 'en'}`, 'artebia-menu');
-});
-
-document.querySelector('#collapseFour').addEventListener('show.bs.collapse', function () {
-    fetchChemicumLunch();
+    fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu');
 });
 
 document.getElementById('copy-div').addEventListener('click', function () {
@@ -674,7 +529,5 @@ document.getElementById('copy-div').addEventListener('click', function () {
 });
 
 // Call the async function to fetch and display the food menu
-fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3003&language=${chosenLang}`, 'alexander-menu');
-fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=3104&language=${chosenLang}`, 'cotton-menu');
-fetchLunchMajority(`https://www.compass-group.fi/menuapi/feed/json?costNumber=1256&language=${chosenLang}`, 'artebia-menu');
-fetchChemicumLunch();
+fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
+fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu');
