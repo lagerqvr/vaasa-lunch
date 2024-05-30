@@ -218,26 +218,23 @@ const outputError = (input) => {
 
 let fullURL;
 
-function getLunchTime(html, dayOfWeek, divName) {
+function getLunchTime(data, divElement) {
     let regex;
-    if (divName == 'alexander-menu') {
+    if (divElement == 'alexander-menu') {
         regex = /Lunch:\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})/;
-    } else {
-        regex = /Lounas kello \s*(\d{2}:\d{2}\s*-\s*\d{2})/
-
-    }
-    const match = html.match(regex);
-    console.log(match);
-    if (match) {
-        const weekLunchTime = match[1];
-        const fridayLunchTime = match[2];
-        if (dayOfWeek >= 1 && dayOfWeek <= 4) { // Monday to Thursday
-            return weekLunchTime;
-        } else if (dayOfWeek === 5) { // Friday
-            return fridayLunchTime;
+        const match = data.match(regex);
+        if (match) {
+            return match[1];
         }
+        return " - "; // Default if no match found
+    } else {
+        regex = /(\d{2}:\d{2}-\d{2})/;
+        const match = data.match(regex);
+        if (match) {
+            return match[1];
+        }
+        return " - "; // Default if no match found
     }
-    return " - "; // Default if no match found
 }
 
 // Function to fetch and display the lunch for the specific day from Arcada, Diak and Artebia 135
@@ -270,7 +267,6 @@ async function fetchLunch(URL, divId) {
 
         // Fetch HTML data
         const data = await response.text();
-        console.log(data);
 
         // Check the status code
         if (response.status === 524) {
@@ -334,17 +330,12 @@ async function fetchLunch(URL, divId) {
         // Constructing the new date string
         const dateFormatted = `${dd}.${mm}`;
 
-        // Extract lunch time from HTML string
-        let htmlString;
-        let divName;
+        let lunchTime;
         if (lunchDiv.id == 'alexander-menu') {
-            divName = "alexander-menu"
-            htmlString = "Lunch: ";
+            lunchTime = getLunchTime(data, lunchDiv.id);
         } else {
-            htmlString = "Lounas kello ";
+            lunchTime = getLunchTime(data, lunchDiv.id);
         }
-        const dayOfWeek = today.getDay();
-        const lunchTime = getLunchTime(htmlString, dayOfWeek, divName);
 
         // Create a regex to find today's date and its associated menu
         let match;
@@ -355,8 +346,6 @@ async function fetchLunch(URL, divId) {
             const regex = new RegExp(`<div class="item-header"><h3>[^<]*${dateFormatted}[^<]*</h3></div><div class="item-body"><ul>(.*?)</ul></div><div class="item-footer">`, 's');
             match = data.match(regex);
         }
-
-        console.log(match);
 
         // Find current weekday
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -416,31 +405,55 @@ async function fetchLunch(URL, divId) {
                     break;
             }
             lunchDiv.appendChild(lunchTimeElement);
+            const menuParagraph = document.createElement('p');
+
+            // Function to capitalize the first letter of a string
+            const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+
+            // Unified parser and trimmer function
+            const parseAndFormatMenuItems = (menuItemsHtml, isList) => {
+                const menuItems = [];
+
+                if (isList) {
+                    // Handle the case where menu items are separated by <br>
+                    const items = menuItemsHtml.split('<br>').map(item => item.trim()).filter(item => item && !item.includes('Sale of leftover food'));
+                    items.forEach(item => {
+                        let formattedItem = item.split(',')
+                            .map(word => word.trim())
+                            .map(word => word.replace(/\s*\b(l|g|s)\b\s*/g, '')) // Remove allergens (single letter words)
+                            .map(capitalizeFirstLetter)
+                            .join(', ');
+                        menuItems.push(formattedItem);
+                    });
+                } else {
+                    // Handle the case where menu items are in <li> elements
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(menuItemsHtml, 'text/html');
+                    doc.querySelectorAll('li .dish').forEach(dishElement => {
+                        let dishText = dishElement.textContent
+                            .replace(/\d+,\d+ \/ \d+,\d+e/g, '') // Remove prices
+                            .replace(/\s*\b(l|g|s)\b\s*/g, '') // Remove allergens (single letter words)
+                            .trim(); // Trim leading and trailing whitespace
+
+                        dishText = dishText.split(',')
+                            .map(word => capitalizeFirstLetter(word.trim()))
+                            .join(', ');
+
+                        menuItems.push(dishText);
+                    });
+                }
+
+                return menuItems.join(', ');
+            };
+
             if (lunchDiv.id == 'alexander-menu') {
                 const menuParagraph = document.createElement('p');
-
-                // Split, trim and filter the menu items
-                const menuItems = match[1].split('<br>').map(item => item.trim()).filter(item => item && !item.includes('Sale of leftover food'));
-
-                // Capitalize the first letter after every comma
-                const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
-                const formattedMenuItems = menuItems.map(item =>
-                    item.split(',').map(capitalizeFirstLetter).join(', ')
-                );
+                const formattedMenuItems = parseAndFormatMenuItems(match[1], true);
                 menuParagraph.innerHTML = "<b>Lunch/lounas</b>: " + formattedMenuItems;
                 lunchDiv.appendChild(menuParagraph);
             } else {
                 const menuParagraph = document.createElement('p');
-
-                const formattedMenuItems = [];
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(match[1], 'text/html');
-                doc.querySelectorAll('li .dish').forEach(dishElement => {
-                    // Extract the text content and remove the price
-                    let dishText = dishElement.textContent.replace(/\d+,\d+ \/ \d+,\d+e/g, '').trim();
-                    dishText = dishText.split(',').map(word => word.trim()).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(', ');
-                    formattedMenuItems.push(dishText);
-                });
+                const formattedMenuItems = parseAndFormatMenuItems(match[1], false);
                 menuParagraph.innerHTML = "<b>Lunch/lounas</b>: " + formattedMenuItems;
                 lunchDiv.appendChild(menuParagraph);
             }
@@ -495,12 +508,11 @@ const copyLunchToClipboard = () => {
         };
 
         // Get the menu items from the DOM
-        const arcadaMenu = document.getElementById('alexander-menu').innerText;
-        const diakMenu = document.getElementById('cotton-menu').innerText;
+        const alexanderMenu = document.getElementById('alexander-menu').innerText;
+        const cottonMenu = document.getElementById('cotton-menu').innerText;
 
         // Construct the lunch object
-        const lunchObj = `${heading}\n\n${formatMenu(arcadaMenu, "Arcada")}\n\n${formatMenu(diakMenu, "DIAK")}\n\n${formatMenu(artebiaMenu, "Artebia")}\n\n${formatMenu(chemicumMenu, "Chemicum")}`;
-        console.log(formatMenu(arcadaMenu, "Arcada"));
+        const lunchObj = `${heading}\n\n${formatMenu(alexanderMenu, "Ravintola Alexander")}\n\n${formatMenu(cottonMenu, "Cotton Club")}`;
 
         // Copy the lunch object to the clipboard
         navigator.clipboard.writeText(lunchObj)
