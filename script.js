@@ -237,7 +237,7 @@ function getLunchTime(data, divElement) {
     }
 }
 
-// Function to fetch and display the lunch for the specific day from Arcada, Diak and Artebia 135
+// Function to fetch and display the lunch for the specific day from Ravintola Alexander and Cotton Club
 async function fetchLunch(URL, divId) {
     try {
         // Get the div where you want to display the data and the user's preferred language
