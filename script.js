@@ -525,40 +525,41 @@ const copyLunchToClipboard = () => {
 			heading = 'Päivän lounas (' + trimmedDate + '):';
 		}
 
-		// Regular expression to extract menu items
-		const regex = /:\s*([^:(]*?)(?:\s*\(|$)/g;
-
-		// Function to clean up and format menu items
-		const cleanUpItems = (items) => {
-			return items.map(item => {
-				let cleanedItem = item.trim().replace(/,\s*$/, '');
-				return cleanedItem;
-			}).filter(item => item && item !== "()");
-		};
-
-		// Function to extract and format menu from a given string
-		const formatMenu = (menuString, locationName) => {
-			if (!menuString || menuString.includes('Failed to fetch') || menuString.includes('No lunch data')) {
-				return `\u{1F4CD}${locationName}: No menu available`;
+		// Function to extract menu items from a restaurant section
+		const extractMenuItems = (menuElement) => {
+			// Check if there's an error message or no data
+			const menuText = menuElement.innerText;
+			if (menuText.includes('Failed to fetch') || menuText.includes('No lunch') || menuText.includes('Fetching')) {
+				return 'No menu available';
 			}
 			
-			const matches = [...menuString.matchAll(regex)];
-			let extractedItems = matches.map(match => match[1].trim()).filter(item => item && item !== "()");
-			// Clean up extracted items to avoid double commas
-			extractedItems = cleanUpItems(extractedItems);
-			return extractedItems.length > 0 ? 
-				`\u{1F4CD}${locationName}: ${extractedItems.join(', ')}` : 
-				`\u{1F4CD}${locationName}: No items listed`;
+			// Get all list items if available
+			const listItems = menuElement.querySelectorAll('ul li');
+			if (listItems.length > 0) {
+				return Array.from(listItems)
+					.map(item => item.innerText.trim())
+					.filter(item => item && !item.includes('Open') && !item.includes('Auki') && !item.includes('Öppet'))
+					.join(', ');
+			} else {
+				// Fallback if no list items found
+				// Extract text content between the opening hours section and any next section
+				const menuContent = menuText
+					.split(/Open:|Auki:|Öppet:/)[1]   // Get content after opening hours
+					.split(/Lunch\/lounas:|Menu link|Full meny|Menu/)[0]  // Stop at menu link section
+					.trim();
+					
+				return menuContent || 'No menu items found';
+			}
 		};
 
-		// Get the menu items from the DOM for all four restaurants
-		const alexanderMenu = document.getElementById('alexander-menu').innerText;
-		const cottonMenu = document.getElementById('cotton-menu').innerText;
-		const mathildaMenu = document.getElementById('mathilda-menu').innerText;
-		const augustMenu = document.getElementById('august-menu').innerText;
+		// Extract menu items from each restaurant
+		const alexanderItems = extractMenuItems(document.getElementById('alexander-menu'));
+		const cottonItems = extractMenuItems(document.getElementById('cotton-menu'));
+		const mathildaItems = extractMenuItems(document.getElementById('mathilda-menu'));
+		const augustItems = extractMenuItems(document.getElementById('august-menu'));
 
 		// Construct the lunch object with all four restaurants
-		const lunchObj = `${heading}\n\n${formatMenu(alexanderMenu, "Ravintola Alexander")}\n\n${formatMenu(cottonMenu, "Cotton Club")}\n\n${formatMenu(mathildaMenu, "Mathilda & Café Oskar")}\n\n${formatMenu(augustMenu, "August Restaurant")}`;
+		const lunchObj = `${heading}\n\n\u{1F4CD}Ravintola Alexander: ${alexanderItems}\n\n\u{1F4CD}Cotton Club: ${cottonItems}\n\n\u{1F4CD}Mathilda & Café Oskar: ${mathildaItems}\n\n\u{1F4CD}August Restaurant: ${augustItems}`;
 
 		// Copy the lunch object to the clipboard
 		navigator.clipboard.writeText(lunchObj);
@@ -809,7 +810,7 @@ function parseLounaatInfoMenu(menuText) {
 				// Clean and format the dish text
 				let dishText = category
 					.replace(/<[^>]*>/g, '')
-					.replace(/\s*\b([L|G|M|S|VL|V])\b\s*/gi, ' ')
+					.replace(/\s*\b([L|G|M|S|VL|V])\b/s, ' ')
 					.replace(/\*/g, '')
 					.replace(/\s+/g, ' ')
 					.trim();
