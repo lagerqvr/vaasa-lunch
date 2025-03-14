@@ -1,99 +1,173 @@
 html,
 body {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
 }
 
 h3 {
-    font-size: 2.1rem;
+	font-size: 2.1rem;
 }
 
 body::-webkit-scrollbar {
-    display: none;
+	display: none;
 }
 
 footer {
-    font-size: 12px;
-    flex-shrink: 0;
-    padding: 3px 20px 17.5px 20px;
-    text-align: center;
+	font-size: 12px;
+	flex-shrink: 0;
+	padding: 3px 20px 17.5px 20px;
+	text-align: center;
 }
 
 footer>a:hover,
 footer>a {
-    text-decoration: none;
+	text-decoration: none;
 }
 
 .currentDate {
-    font-size: calc(1.6rem + 0.5vw);
-    font-weight: 300;
-    vertical-align: middle;
+	font-size: calc(1.6rem + 0.5vw);
+	font-weight: 300;
+	vertical-align: middle;
 }
 
 .container {
-    flex: 1 0 auto;
+	flex: 1 0 auto;
 }
 
 .date-selector {
-    cursor: pointer;
+	cursor: pointer;
 }
 
 .accordion-body {
-    min-height: 300px;
+	min-height: 300px;
+}
+
+/* Custom accordion styling */
+.accordion-button:not(.collapsed) {
+	color: #9b0000; /* Darker red for text */
+	background-color: #ffeded; /* Light red for background */
+	box-shadow: none;
+}
+
+/* Dark mode accordion styling */
+[data-bs-theme="dark"] .accordion-button:not(.collapsed) {
+	color: #ff6b6b; /* Lighter red for dark mode text */
+	background-color: #3a0000; /* Dark red for background */
+}
+
+.accordion-button:focus {
+	box-shadow: none;
+	border-color: rgba(0,0,0,.125);
+}
+
+/* Custom accordion arrow color */
+.accordion-button::after {
+	color: inherit;
+	background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%239b0000'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+/* Dark mode accordion arrow color */
+[data-bs-theme="dark"] .accordion-button::after {
+	background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ff6b6b'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+/* Language selection styling - prevent any blue states */
+.dropdown-item.active,
+.dropdown-item:active,
+.dropdown-item:focus,
+.dropdown-item:focus-visible,
+.dropdown-item.selected,
+.dropdown-item.selected:active,
+.dropdown-item.selected:focus {
+	color: #9b0000; /* Darker red for text */
+	background-color: #ffeded; /* Light red background */
+	outline: none;
+	box-shadow: none;
+}
+
+/* Dark mode language selection styling */
+[data-bs-theme="dark"] .dropdown-item.active,
+[data-bs-theme="dark"] .dropdown-item:active,
+[data-bs-theme="dark"] .dropdown-item:focus,
+[data-bs-theme="dark"] .dropdown-item:focus-visible,
+[data-bs-theme="dark"] .dropdown-item.selected,
+[data-bs-theme="dark"] .dropdown-item.selected:active,
+[data-bs-theme="dark"] .dropdown-item.selected:focus {
+	color: #ff6b6b; /* Lighter red for dark mode text */
+	background-color: #3a0000; /* Dark red for background */
+}
+
+/* Override Bootstrap's blue focus state */
+.dropdown-item:focus-visible {
+	outline: none;
 }
 
 #alexander-menu,
 #cotton-menu,
+#august-menu,
+#mathilda-menu,
 #errorMsg {
-    font-size: 14px;
+	font-size: 14px;
 }
 
 #errorMsg {
-    width: fit-content;
+	width: fit-content;
 }
 
 .menu-link {
-    padding-top: 2px;
-    font-size: calc(0.8rem + 0.3vw);
+	padding-top: 2px;
+	font-size: calc(0.8rem + 0.3vw);
+	color: #9b0000; 
+}
+
+/* Dark mode menu-link styling */
+[data-bs-theme="dark"] .menu-link {
+	color: #ff6b6b;
 }
 
 .openTxt {
-    font-size: calc(1rem + 0.2vw);
+	font-size: calc(1rem + 0.2vw);
 }
 
 @media (max-width: 360px) {
-    .openTxt {
-        font-size: calc(0.9rem + 0.1vw);
-    }
+	.openTxt {
+		font-size: calc(0.9rem + 0.1vw);
+	}
 
-    .menu-link {
-        font-size: calc(0.7rem + 0.3vw);
-    }
+	.menu-link {
+		font-size: calc(0.7rem + 0.3vw);
+	}
 }
 
 @media (min-width: 1600px) {
-    .currentDate {
-        font-size: 1.7rem;
-    }
+	.currentDate {
+		font-size: 1.7rem;
+	}
 }
 
 @keyframes pulseAnimation {
-    0% {
-        transform: scale(1);
-    }
+	0% {
+		transform: scale(1);
+	}
 
-    50% {
-        transform: scale(1.25);
-    }
+	50% {
+		transform: scale(1.25);
+	}
 
-    100% {
-        transform: scale(1);
-    }
+	100% {
+		transform: scale(1);
+	}
 }
 
 .animated {
-    animation: pulseAnimation 0.4s ease;
+	animation: pulseAnimation 0.4s ease;
+}
+
+.heading {
+	font-size: 1.8rem;
+	font-family: Silkscreen;
+	letter-spacing: -0.27rem;
 }
