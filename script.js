@@ -473,6 +473,11 @@ async function fetchLunch(URL, divId) {
 			menuItems.forEach(item => {
 				const li = document.createElement('li');
 				li.innerHTML = item;
+				// Add text wrapping styles to list items
+				li.style.wordWrap = 'break-word';
+				li.style.overflowWrap = 'break-word';
+				li.style.whiteSpace = 'normal';
+				li.style.maxWidth = '100%';
 				menuList.appendChild(li);
 			});
 
