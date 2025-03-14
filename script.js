@@ -615,34 +615,20 @@ function standardizeFormatting(text) {
 
 // Function to parse Alexander restaurant menu format
 function parseAlexanderMenu(menuText) {
-	// Clean up the menu items (remove allergens temporarily, etc.)
+	// Clean up the menu items (remove allergens, etc.)
 	const items = menuText.split('<br>').map(item => item.trim())
 		.filter(item => item && !item.includes('Sale of leftover food'));
 	
 	return items.map(item => {
-		// Extract allergens before removing them
-		const allergens = [];
-		const allergenMatch = item.match(/\b([L|G|M|S|VL](?:\/[L|G|M|S|VL])*)\b/g);
-		if (allergenMatch) {
-			allergenMatch.forEach(match => {
-				match.split('/').forEach(allergen => {
-					if (!allergens.includes(allergen)) allergens.push(allergen);
-				});
-			});
-		}
-
 		// Clean the text of formatting but keep the dish description
 		const cleanedText = standardizeFormatting(item
-			.replace(/\s*\b([L|G|M|S|VL]\/)*[L|G|M|S|VL](\b\s*)/g, '')  // Remove L/G etc.
+			.replace(/\s*\b([L|G|M|S|VL|V]\/)*[L|G|M|S|VL|V](\b\s*)/g, '')  // Remove L/G etc.
 			.replace(/\*,?\s*/g, '')  // Remove asterisks
 			.replace(/\s*\(.+?\)\s*/g, '') // Remove anything in parentheses
 			.trim());
 		
-		// Add allergens in parentheses if any were found
-		const formattedText = capitalizeFirstLetter(cleanedText) + 
-			(allergens.length > 0 ? ` (${allergens.sort().join(', ')})` : '');
-		
-		return formattedText;
+		// Return the formatted text with no allergens
+		return capitalizeFirstLetter(cleanedText);
 	});
 }
 
@@ -666,7 +652,6 @@ function parseLounaatInfoMenu(menuText) {
 				
 				// Extract the dish descriptions
 				const dishDescriptions = [];
-				const allergens = [];
 				
 				// Process the info HTML to get dish descriptions
 				const tempDiv = document.createElement('div');
@@ -681,35 +666,21 @@ function parseLounaatInfoMenu(menuText) {
 						.replace(/\*/g, '')
 						.replace(/>/g, '')
 						.replace(/,\s*$/, '')
+						.replace(/\s*\b([L|G|M|S|VL|V])\b\s*/gi, '') // Remove allergen codes
 						.trim();
 					
-					if (cleanInfo) {
-						// Check for allergens
-						const allergenMatch = info.match(/\b([L|G|M|S|VL|V])\b/gi);
-						if (allergenMatch) {
-							allergenMatch.forEach(match => {
-								const allergen = match.toUpperCase();
-								if (!allergens.includes(allergen)) allergens.push(allergen);
-							});
-						}
-						
-						// Clean text of allergens for the dish description
-						const cleanedText = cleanInfo.replace(/\s*\b([L|G|M|S|VL|V])\b\s*/gi, ' ').trim();
-						if (cleanedText && !cleanedText.match(/^[\s,.*•]*$/)) {
-							dishDescriptions.push(cleanedText);
-						}
+					if (cleanInfo && !cleanInfo.match(/^[\s,.*•]*$/)) {
+						dishDescriptions.push(cleanInfo);
 					}
 				});
 				
-				// Format the complete menu item
+				// Format the complete menu item without allergens
 				if (dishDescriptions.length > 0) {
-					const formattedText = capitalizeFirstLetter(category) + ": " + 
-						dishDescriptions.join('; ') + 
-						(allergens.length > 0 ? ` (${allergens.sort().join(', ')})` : '');
+					const formattedText = capitalizeFirstLetter(category) + ": " +
+						dishDescriptions.join('; ');
 					menuItems.push(formattedText);
 				} else {
-					menuItems.push(capitalizeFirstLetter(category) + 
-						(allergens.length > 0 ? ` (${allergens.sort().join(', ')})` : ''));
+					menuItems.push(capitalizeFirstLetter(category));
 				}
 			}
 		});
@@ -736,39 +707,7 @@ function parseLounaatInfoMenu(menuText) {
 					if (dishElement) {
 						// Extract the main text content
 						let dishText = dishElement.textContent.trim();
-						
-						// Extract allergens from class names and links
-						const allergens = [];
-						
-						// Check for diet classes in the menu item
-						const dietClasses = Array.from(menuItem.classList)
-							.filter(cls => cls.startsWith('item-diet-'));
-						
-						dietClasses.forEach(cls => {
-							const allergen = cls.replace('item-diet-', '').toUpperCase();
-							if (allergen && !allergens.includes(allergen)) {
-								allergens.push(allergen);
-							}
-						});
-						
-						// Also check for allergen links in the dish
-						const allergenLinks = dishElement.querySelectorAll('.diet');
-						allergenLinks.forEach(link => {
-							const allergen = link.textContent.trim().toUpperCase();
-							if (allergen && !allergens.includes(allergen)) {
-								allergens.push(allergen);
-							}
-						});
-						
-						// Also look for direct text allergens (like "l", "g", "s" etc.)
-						const allergenMatches = dishText.match(/\b([L|G|M|S|VL|V])\b/gi);
-						if (allergenMatches) {
-							allergenMatches.forEach(match => {
-								const allergen = match.toUpperCase();
-								if (!allergens.includes(allergen)) allergens.push(allergen);
-							});
-						}
-						
+
 						// Clean up the dish text
 						dishText = dishText
 							.replace(/<[^>]*>/g, '') // Remove any remaining HTML
@@ -776,12 +715,10 @@ function parseLounaatInfoMenu(menuText) {
 							.replace(/\*/g, '') // Remove asterisks
 							.replace(/\s+/g, ' ') // Normalize spaces
 							.trim();
-						
-						// Add the clean dish with allergens in standardized format
+
+						// Add the clean dish without allergens
 						if (dishText) {
-							const formattedText = capitalizeFirstLetter(dishText) + 
-								(allergens.length > 0 ? ` (${allergens.sort().join(', ')})` : '');
-							menuItems.push(formattedText);
+							menuItems.push(capitalizeFirstLetter(dishText));
 						}
 					}
 				});
@@ -796,28 +733,16 @@ function parseLounaatInfoMenu(menuText) {
 			if (dishElement) {
 				let category = dishElement.textContent.trim();
 				
-				// Extract allergens
-				const allergens = [];
-				
-				// Check class names for allergen info
-				Array.from(menuItemElement.classList)
-					.filter(cls => cls.startsWith('item-diet-'))
-					.forEach(cls => {
-						const allergen = cls.replace('item-diet-', '').toUpperCase();
-						if (!allergens.includes(allergen)) allergens.push(allergen);
-					});
-				
 				// Clean and format the dish text
 				let dishText = category
 					.replace(/<[^>]*>/g, '')
-					.replace(/\s*\b([L|G|M|S|VL|V])\b/s, ' ')
+					.replace(/\s*\b([L|G|M|S|VL|V])\b\s*/gi, ' ')
 					.replace(/\*/g, '')
 					.replace(/\s+/g, ' ')
 					.trim();
 				
 				if (dishText) {
-					const formattedText = capitalizeFirstLetter(dishText) + 
-						(allergens.length > 0 ? ` (${allergens.sort().join(', ')})` : '');
+					const formattedText = capitalizeFirstLetter(dishText);
 					menuItems.push(formattedText);
 				}
 			}
