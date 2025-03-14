@@ -238,12 +238,6 @@ const outputError = (input) => {
 
 // List of CORS proxies to try
 const corsProxies = [
-	'https://corsproxy.io/?',
-	'https://api.allorigins.win/raw?url=',
-	'https://proxy.cors.sh/',
-	'https://crossorigin.me/',
-	'https://cors-proxy.htmldriven.com/?url=',
-	'https://thingproxy.freeboard.io/fetch/',
 	'https://api.cors.lol/?url=',
 ];
 
