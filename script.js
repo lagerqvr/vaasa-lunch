@@ -241,6 +241,40 @@ const corsProxies = [
 	'https://api.cors.lol/?url=',
 ];
 
+// Function to toggle all accordion elements when clicking on the heading
+const toggleAllAccordions = () => {
+	try {
+		// Get all accordion buttons
+		const accordionButtons = document.querySelectorAll('.accordion-button');
+		
+		// Check if all accordions are already open
+		const allOpen = Array.from(accordionButtons).every(button => !button.classList.contains('collapsed'));
+		
+		// Toggle accordions based on current state
+		accordionButtons.forEach(button => {
+			// If all are open, close them all
+			// If some are closed, open them all
+			if ((allOpen && !button.classList.contains('collapsed')) || 
+				(!allOpen && button.classList.contains('collapsed'))) {
+				button.click();
+			}
+		});
+	} catch (error) {
+		outputError(error.message + ` (${error.stack})`);
+		console.log(error.message);
+	}
+};
+
+// Add event listener to the heading element after DOM content is loaded
+document.addEventListener('DOMContentLoaded', () => {
+	const headingElement = document.querySelector('.heading');
+	if (headingElement) {
+		headingElement.style.cursor = 'pointer';
+		headingElement.title = 'Click to toggle all menus';
+		headingElement.addEventListener('click', toggleAllAccordions);
+	}
+});
+
 let fullURL;
 
 function getLunchTime(data, divId) {
