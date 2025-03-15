@@ -41,26 +41,26 @@ const setLanguage = () => {
 	dropdownItems.forEach(item => {
 		item.classList.remove('selected');
 	});
-	
+
 	// Get the stored language
 	const storedLang = localStorage.getItem('selected-language');
-	
+
 	// Add 'selected' class to the current language item
 	dropdownItems.forEach(item => {
 		if (item.getAttribute('data-lang') === storedLang) {
 			item.classList.add('selected');
 		}
 	});
-	
+
 	dropdownItems.forEach(item => {
 		item.addEventListener('click', function (event) {
 			event.preventDefault();
 			const lang = this.getAttribute('data-lang');
-			
+
 			// Remove 'selected' class from all items and add to the clicked one
 			dropdownItems.forEach(item => item.classList.remove('selected'));
 			this.classList.add('selected');
-			
+
 			if (lang === 'en') {
 				document.querySelector('#lunchline').innerHTML = 'All your most important (Vaasa) lunch menus in one place.';
 				document.querySelector('#lang-btn').innerHTML = 'Language';
@@ -78,13 +78,13 @@ const setLanguage = () => {
 				document.querySelector('#copy-text').innerHTML = 'Kopioi lounaslistat';
 			};
 			localStorage.setItem('selected-language', lang);
-			
+
 			// Reload all menus
 			fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
 			fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu');
 			fetchLunch(`https://www.lounaat.info/lounas/food-co-mathilda-cafe-oskar/vaasa`, 'mathilda-menu');
 			fetchLunch(`https://www.lounaat.info/lounas/august-restaurant/vaasa`, 'august-menu');
-			
+
 		});
 	});
 };
@@ -238,73 +238,187 @@ const outputError = (input) => {
 
 // List of CORS proxies to try
 const corsProxies = [
+	'https://api.allorigins.win/raw?url=',
+	'https://corsproxy.io/?',
+	'https://proxy.cors.sh/',
 	'https://api.cors.lol/?url=',
 ];
 
-let fullURL;
+// Simple cache system to store fetched data
+const menuCache = {
+	store: {},
 
-function getLunchTime(data, divId) {
-	// Different restaurants have different formats for their lunch times
-	try {
-		if (divId === 'alexander-menu') {
-			// Alexander format: "Lunch: 11:00 - 14:00"
-			const regex = /Lunch:\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})/;
-			const match = data.match(regex);
-			return match ? match[1] : "11:00 - 14:00"; // Default if no match found
-		} else {
-			// For lounaat.info style restaurants (Cotton Club, Mathilda, August)
-			const metaMatch = data.match(/<meta itemprop="openingHours" content="([^"]*)" \/>([^<]*)/);
-			if (metaMatch) {
-				// First try to extract from meta tag if present
-				const hours = metaMatch[2].trim();
-				// Clean up the hours - remove day prefixes (ma-pe:, ma-to:, etc) and trailing commas
-				return hours.replace(/[a-zåäö\-]+:\s*/i, "").replace(/,\s*$/, "");
-			} else {
-				// Fallback - try to find in general content
-				const generalMatch = data.match(/ma-pe:\s*(\d{1,2}[:.-]\d{1,2}[-–]\d{1,2}[:.-]\d{1,2})/);
-				return generalMatch ? generalMatch[1] : "11-14"; // Default hours
+	// Get cached data by URL and date
+	get: function (url, date) {
+		const key = `${url}_${date}`;
+		const cachedData = localStorage.getItem(key);
+
+		if (cachedData) {
+			try {
+				const parsed = JSON.parse(cachedData);
+				// Check if we have cached data and it's not expired (12 hours)
+				if (parsed && (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000)) {
+					console.log(`Using cached data for ${url}`);
+					return parsed.data;
+				}
+			} catch (e) {
+				console.error("Error parsing cache:", e);
+				// If there's an error parsing, remove the invalid cache entry
+				localStorage.removeItem(key);
 			}
 		}
-	} catch (error) {
-		console.error("Error parsing lunch time:", error);
-		return "11-14"; // Default fallback
-	}
-}
+		return null;
+	},
 
-// Function to attempt fetching with multiple proxies
-async function fetchWithProxies(URL) {
-	let lastError = null;
-	
-	// Try each proxy in sequence
-	for (let proxy of corsProxies) {
+	// Store data for URL and date
+	set: function (url, date, data) {
 		try {
-			const fullURL = proxy ? proxy + encodeURIComponent(URL) : URL;
-			console.log(`Trying to fetch with: ${proxy || 'direct fetch'}`);
-			
-			const response = await fetch(fullURL, {
+			const key = `${url}_${date}`;
+			const cacheObject = {
+				timestamp: Date.now(),
+				data: data
+			};
+			localStorage.setItem(key, JSON.stringify(cacheObject));
+		} catch (e) {
+			console.error("Error setting cache:", e);
+			// If localStorage is full, clear some old items
+			this.clearOldCache();
+		}
+	},
+
+	// Clear older cache entries if localStorage is getting full
+	clearOldCache: function () {
+		try {
+			// Find all menu cache keys
+			const keysToRemove = [];
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				if (key && key.includes('_')) {
+					keysToRemove.push(key);
+				}
+			}
+
+			// Sort by age (newest first) and remove older half
+			if (keysToRemove.length > 10) {
+				const sortedKeys = keysToRemove.sort((a, b) => {
+					try {
+						const aTime = JSON.parse(localStorage.getItem(a))?.timestamp || 0;
+						const bTime = JSON.parse(localStorage.getItem(b))?.timestamp || 0;
+						return bTime - aTime;
+					} catch (e) {
+						return 0;
+					}
+				});
+
+				// Remove the older half of the cache
+				const toRemove = sortedKeys.slice(Math.floor(sortedKeys.length / 2));
+				toRemove.forEach(key => localStorage.removeItem(key));
+			}
+		} catch (e) {
+			console.error("Error clearing cache:", e);
+		}
+	}
+};
+
+// Function to attempt fetching with CORS handling
+async function fetchWithProxies(URL) {
+	// Get date for caching
+	const dateKey = currentDate.toISOString().split('T')[0];
+
+	// Check cache first
+	const cachedData = menuCache.get(URL, dateKey);
+	if (cachedData) {
+		return cachedData;
+	}
+
+	try {
+		// First try direct fetch (might work for some URLs)
+		try {
+			console.log(`Trying direct fetch: ${URL}`);
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+			const response = await fetch(URL, {
 				method: 'GET',
+				mode: 'cors',
 				headers: {
 					'Content-Type': 'text/html; charset=utf-8',
-					'Origin': window.location.origin,
 				},
-				// Add a reasonable timeout
-				signal: AbortSignal.timeout(10000) // 10 seconds timeout
+				signal: controller.signal
 			});
-			
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+
+			clearTimeout(timeoutId);
+
+			if (response.ok) {
+				const data = await response.text();
+				menuCache.set(URL, dateKey, data);
+				return data;
 			}
-			
-			return await response.text();
-		} catch (error) {
-			console.log(`${proxy || 'Direct fetch'} failed: ${error.message}`);
-			lastError = error;
-			// Continue to the next proxy
+		} catch (directError) {
+			console.log(`Direct fetch failed: ${directError.message}`);
+			// Continue to proxy approach
 		}
+
+		// Try each proxy in sequence with proper error handling
+		for (const proxy of corsProxies) {
+			try {
+				console.log(`Trying proxy: ${proxy}`);
+				const proxyUrl = `${proxy}${encodeURIComponent(URL)}`;
+
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+				const response = await fetch(proxyUrl, {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'text/html; charset=utf-8',
+					},
+					signal: controller.signal
+				});
+
+				clearTimeout(timeoutId);
+
+				if (response.ok) {
+					const data = await response.text();
+					if (data && data.length > 100) { // Simple check to verify we got actual content
+						menuCache.set(URL, dateKey, data);
+						return data;
+					} else {
+						console.log(`Proxy ${proxy} returned too little data, trying next...`);
+					}
+				}
+			} catch (proxyError) {
+				console.log(`Proxy ${proxy} failed: ${proxyError.message}`);
+				// Continue to next proxy
+			}
+		}
+
+		// Last resort: try to fetch from a local sample file
+		try {
+			console.log("All remote fetches failed. Trying to load from local sample...");
+			const localFile = URL.includes('alexander') ? '/client/sample_alexander.txt' :
+				URL.includes('cotton') ? '/client/sample_cotton.txt' :
+					URL.includes('mathilda') ? '/client/sample_mathilda.txt' :
+						'/client/sample.txt';
+
+			const sampleResponse = await fetch(localFile);
+			if (sampleResponse.ok) {
+				const sampleData = await sampleResponse.text();
+				if (sampleData && sampleData.length > 100) {
+					console.log("Using local sample data as fallback");
+					return sampleData;
+				}
+			}
+		} catch (sampleError) {
+			console.log(`Local sample fallback failed: ${sampleError.message}`);
+		}
+
+		// If we've tried everything and nothing worked
+		throw new Error("All fetch methods failed");
+	} catch (error) {
+		console.error(`Error fetching data: ${error.message}`);
+		throw new Error(`Unable to fetch menu data. Please check your internet connection or try again later.`);
 	}
-	
-	// If we've tried all proxies and none worked, throw the last error
-	throw new Error(`All methods failed to fetch data. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
 // Function to fetch and display the lunch for all restaurants
@@ -325,7 +439,7 @@ async function fetchLunch(URL, divId) {
 
 		// Try to fetch with multiple proxies
 		const data = await fetchWithProxies(URL);
-		
+
 		// Get reminder notes div
 		const reminderNotes = document.querySelectorAll('.lang-reminder');
 		lunchDiv.innerHTML = '';
@@ -383,14 +497,14 @@ async function fetchLunch(URL, divId) {
 		const isWeekend = (day === 'Sat' || day === 'Sun');
 
 		if (isWeekend) {
-		  if (lang === 'en') {
-			lunchDiv.innerHTML = '<p>No lunch service on weekends.</p>';
-		  } else if (lang === 'sv-FI') {
-			lunchDiv.innerHTML = '<p>Ingen lunchservice under helgen.</p>';
-		  } else {
-			lunchDiv.innerHTML = '<p>Ei lounaspalvelua viikonloppuisin.</p>';
-		  }
-		  return;
+			if (lang === 'en') {
+				lunchDiv.innerHTML = '<p>No lunch service on weekends.</p>';
+			} else if (lang === 'sv-FI') {
+				lunchDiv.innerHTML = '<p>Ingen lunchservice under helgen.</p>';
+			} else {
+				lunchDiv.innerHTML = '<p>Ei lounaspalvelua viikonloppuisin.</p>';
+			}
+			return;
 		}
 
 		// Create a regex to find today's date and its associated menu
@@ -399,7 +513,7 @@ async function fetchLunch(URL, divId) {
 
 		if (divId === 'alexander-menu') {
 			// Alexander restaurant format - try multiple patterns for more robustness
-			
+
 			// Try multiple date formats and patterns
 			const regexPatterns = [
 				// Standard pattern with full match
@@ -409,7 +523,7 @@ async function fetchLunch(URL, divId) {
 				// More flexible pattern - look for date anywhere in a header followed by content
 				new RegExp(`<h\\d[^>]*>[^<]*${dateFormatted}[^<]*</h\\d>\\s*<p>(.*?)</p>`, 's')
 			];
-			
+
 			// Try each pattern until we find a match
 			for (const pattern of regexPatterns) {
 				match = data.match(pattern);
@@ -418,12 +532,12 @@ async function fetchLunch(URL, divId) {
 					break;
 				}
 			}
-			
+
 			// If still no match, try to extract any menu content
 			if (menuItems.length === 0) {
 				const anyMenuPattern = /<div class="lunch-menu__day[^>]*>[\s\S]*?<p>([\s\S]*?)<\/p>/g;
 				const allMatches = [...data.matchAll(anyMenuPattern)];
-				
+
 				// Find the closest date - any menu is better than no menu
 				for (const menuMatch of allMatches) {
 					if (menuMatch[1] && !menuMatch[1].includes('Sale of leftover food')) {
@@ -443,7 +557,7 @@ async function fetchLunch(URL, divId) {
 
 		if (menuItems.length > 0) {
 			const lunchTimeElement = document.createElement('div');
-			
+
 			// Generate the restaurant-specific header with open hours and menu link
 			lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
 				<div class="col-8">
@@ -461,7 +575,7 @@ async function fetchLunch(URL, divId) {
 					</a>
 				</div>
 			</div>`;
-			
+
 			lunchDiv.appendChild(lunchTimeElement);
 
 			const menuParagraph = document.createElement('div');
@@ -514,7 +628,7 @@ const copyLunchToClipboard = () => {
 	try {
 		const lang = localStorage.getItem('selected-language') || 'en';
 		const trimmedDate = document.querySelector('.currentDate').innerText.trim().replace(/^(0?)(\d{1,2})\.(0?)(\d{1,2})\.\d{2}$/, "$2.$4");
-		
+
 		let heading;
 		if (lang === 'en') {
 			heading = 'Today\'s lunch (' + trimmedDate + '):';
@@ -531,7 +645,7 @@ const copyLunchToClipboard = () => {
 			if (menuText.includes('Failed to fetch') || menuText.includes('No lunch') || menuText.includes('Fetching')) {
 				return 'No menu available';
 			}
-			
+
 			// Get all list items if available
 			const listItems = menuElement.querySelectorAll('ul li');
 			if (listItems.length > 0) {
@@ -546,7 +660,7 @@ const copyLunchToClipboard = () => {
 					.split(/Open:|Auki:|Öppet:/)[1]   // Get content after opening hours
 					.split(/Lunch\/lounas:|Menu link|Full meny|Menu/)[0]  // Stop at menu link section
 					.trim();
-					
+
 				return menuContent || 'No menu items found';
 			}
 		};
@@ -562,7 +676,7 @@ const copyLunchToClipboard = () => {
 
 		// Copy the lunch object to the clipboard
 		navigator.clipboard.writeText(lunchObj);
-		
+
 		console.log("Lunch menu copied to clipboard");
 	} catch (error) {
 		outputError(error.message + ` (${error.stack})`);
@@ -598,9 +712,9 @@ document.getElementById('copy-div').addEventListener('click', function () {
 
 // Call the async function to fetch and display the food menu
 fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu'),
-fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu'),
-fetchLunch(`https://www.lounaat.info/lounas/food-co-mathilda-cafe-oskar/vaasa`, 'mathilda-menu'),
-fetchLunch(`https://www.lounaat.info/lounas/august-restaurant/vaasa`, 'august-menu')
+	fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu'),
+	fetchLunch(`https://www.lounaat.info/lounas/food-co-mathilda-cafe-oskar/vaasa`, 'mathilda-menu'),
+	fetchLunch(`https://www.lounaat.info/lounas/august-restaurant/vaasa`, 'august-menu')
 
 // Function to standardize text formatting while preserving number formats
 function standardizeFormatting(text) {
@@ -617,7 +731,7 @@ function parseAlexanderMenu(menuText) {
 	// Clean up the menu items (remove allergens, etc.)
 	const items = menuText.split('<br>').map(item => item.trim())
 		.filter(item => item && !item.includes('Sale of leftover food'));
-	
+
 	return items.map(item => {
 		// Clean the text of formatting but keep the dish description
 		const cleanedText = standardizeFormatting(item
@@ -625,7 +739,7 @@ function parseAlexanderMenu(menuText) {
 			.replace(/\*,?\s*/g, '')  // Remove asterisks
 			.replace(/\s*\(.+?\)\s*/g, '') // Remove anything in parentheses
 			.trim());
-		
+
 		// Return the formatted text with no allergens
 		return capitalizeFirstLetter(cleanedText);
 	});
@@ -636,7 +750,7 @@ function parseLounaatInfoMenu(menuText) {
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(menuText, 'text/html');
 	const menuItems = [];
-	
+
 	// First try a more specific approach for Mathilda's unique format
 	const menuItemElements = doc.querySelectorAll('.menu-item');
 	if (menuText.includes('café oskarissa') || menuText.includes('mathilda')) {
@@ -644,21 +758,21 @@ function parseLounaatInfoMenu(menuText) {
 		menuItemElements.forEach(menuItem => {
 			const dishElement = menuItem.querySelector('.dish');
 			const infoElement = menuItem.querySelector('.info');
-			
+
 			if (dishElement && infoElement) {
 				// Get the category name
 				let category = dishElement.textContent.trim();
-				
+
 				// Extract the dish descriptions
 				const dishDescriptions = [];
-				
+
 				// Process the info HTML to get dish descriptions
 				const tempDiv = document.createElement('div');
 				tempDiv.innerHTML = infoElement.innerHTML.replace(/<br\s*\/?>/gi, '|||');
-				
+
 				// Split by our custom separator
 				const infoTexts = tempDiv.textContent.split('|||');
-				
+
 				// Process each part
 				infoTexts.forEach(info => {
 					const cleanInfo = info.trim()
@@ -667,12 +781,12 @@ function parseLounaatInfoMenu(menuText) {
 						.replace(/,\s*$/, '')
 						.replace(/\s*\b([L|G|M|S|VL|V])\b\s*/gi, '') // Remove allergen codes
 						.trim();
-					
+
 					if (cleanInfo && !cleanInfo.match(/^[\s,.*•]*$/)) {
 						dishDescriptions.push(cleanInfo);
 					}
 				});
-				
+
 				// Format the complete menu item without allergens
 				if (dishDescriptions.length > 0) {
 					const formattedText = capitalizeFirstLetter(category) + ": " +
@@ -684,22 +798,22 @@ function parseLounaatInfoMenu(menuText) {
 			}
 		});
 	}
-	
+
 	// If we found menu items specifically for Mathilda, return them
 	if (menuItems.length > 0 && (menuText.includes('café oskarissa') || menuText.includes('mathilda'))) {
 		return menuItems;
 	}
-	
+
 	// Otherwise use the general approach for other restaurants
 	let menuFound = false;
-	
+
 	doc.querySelectorAll('.item').forEach(item => {
 		const header = item.querySelector('.item-header h3');
 		if (header && !menuFound) {
 			const menuItemsList = item.querySelectorAll('.menu-item');
 			if (menuItemsList.length > 0 && !item.querySelector('.info')?.textContent.includes('puuttuu')) {
 				menuFound = true;
-				
+
 				menuItemsList.forEach(menuItem => {
 					// Extract dish names directly
 					const dishElement = menuItem.querySelector('.dish');
@@ -731,7 +845,7 @@ function parseLounaatInfoMenu(menuText) {
 			const dishElement = menuItemElement.querySelector('.dish');
 			if (dishElement) {
 				let category = dishElement.textContent.trim();
-				
+
 				// Clean and format the dish text
 				let dishText = category
 					.replace(/<[^>]*>/g, '')
@@ -739,7 +853,7 @@ function parseLounaatInfoMenu(menuText) {
 					.replace(/\*/g, '')
 					.replace(/\s+/g, ' ')
 					.trim();
-				
+
 				if (dishText) {
 					const formattedText = capitalizeFirstLetter(dishText);
 					menuItems.push(formattedText);
@@ -747,7 +861,7 @@ function parseLounaatInfoMenu(menuText) {
 			}
 		});
 	}
-	
+
 	return menuItems;
 }
 
