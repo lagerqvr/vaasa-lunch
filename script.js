@@ -455,40 +455,38 @@ async function fetchLunch(URL, divId) {
 		const isWeekend = (day === 'Sat' || day === 'Sun');
 
 		if (isWeekend) {
-		  const lunchTimeElement = document.createElement('div');
-		  
-		  lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
-			  <div class="col-8">
-				  <p class="openTxt"><b>${openTxt}</b><span class="text-secondary"> -</span></p>
-			  </div>
-			  <div class="col-4 d-flex justify-content-end">
-				  <a style="text-decoration: none;" class="menu-link" href="${restaurantUrl}">${menuLinkTxt}
-					  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
-						  class="bi bi-box-arrow-up-right mb-1 ml-1" viewBox="0 0 16 16">
-						  <path fill-rule="evenodd"
-							  d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
-						  <path fill-rule="evenodd"
-							  d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
-					  </svg>
-				  </a>
-			  </div>
-		  </div>`;
-		  
-		  lunchDiv.appendChild(lunchTimeElement);
+			const lunchTimeElement = document.createElement('div');
+			
+			lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
+				<div class="col-8">
+					<p class="openTxt"><b>${openTxt}</b><span class="text-secondary"> -</span></p>
+				</div>
+				<div class="col-4 d-flex justify-content-end">
+					<a style="text-decoration: none;" class="menu-link" href="${restaurantUrl}">${menuLinkTxt}
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
+							class="bi bi-box-arrow-up-right mb-1 ml-1" viewBox="0 0 16 16">
+							<path fill-rule="evenodd"
+								d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
+							<path fill-rule="evenodd"
+								d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
+						</svg>
+					</a>
+				</div>
+			</div>`;
+			
+			lunchDiv.appendChild(lunchTimeElement);
 
-		  const noWeekendElement = document.createElement('p');
-		  noWeekendElement.style.marginTop = '8px';
-
-		  if (lang === 'en') {
-			noWeekendElement.textContent = 'No lunch service on weekends.';
-		  } else if (lang === 'sv-FI') {
-			noWeekendElement.textContent = 'Ingen lunchservice under helgen.';
-		  } else {
-			noWeekendElement.textContent = 'Ei lounaspalvelua viikonloppuisin.';
-		  }
-		  
-		  lunchDiv.appendChild(noWeekendElement);
-		  return;
+			const noWeekendElement = document.createElement('p');
+			if (lang === 'en') {
+				noWeekendElement.textContent = 'No lunch service on weekends.';
+			} else if (lang === 'sv-FI') {
+				noWeekendElement.textContent = 'Ingen lunchservice under helgen.';
+			} else {
+				noWeekendElement.textContent = 'Ei lounaspalvelua viikonloppuisin.';
+			}
+			
+			lunchDiv.appendChild(noWeekendElement);
+			return;
 		}
 
 		// Create a regex to find today's date and its associated menu
