@@ -584,7 +584,6 @@ async function fetchLunch(URL, divId) {
 			const menuList = document.createElement('ul');
 			menuList.style.paddingLeft = '20px';
 			menuList.style.marginTop = '8px';
-
 			menuItems.forEach(item => {
 				const li = document.createElement('li');
 				li.innerHTML = item;
@@ -601,7 +600,6 @@ async function fetchLunch(URL, divId) {
 
 		} else {
 			const noDataElement = document.createElement('p');
-			noDataElement.style.marginTop = '8px';
 			
 			if (lang === 'en') {
 				noDataElement.textContent = 'No lunch data available for the selected day.';

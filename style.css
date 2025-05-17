@@ -130,6 +130,7 @@ footer>a {
 
 .openTxt {
 	font-size: calc(1rem + 0.2vw);
+	margin-bottom: 8px;
 }
 
 @media (max-width: 360px) {
