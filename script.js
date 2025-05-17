@@ -236,10 +236,11 @@ const outputError = (input) => {
 	}
 };
 
-// List of CORS proxies to try
-const corsProxies = [
-	'https://api.cors.lol/?url=',
-];
+// API configuration
+const API_CONFIG = {
+	retries: 3,
+	retryDelay: 1000,  // 1 second between retries
+};
 
 // Function to toggle all accordion elements when clicking on the heading
 const toggleAllAccordions = () => {
@@ -305,40 +306,50 @@ function getLunchTime(data, divId) {
 	}
 }
 
-// Function to attempt fetching with multiple proxies
+// Function to fetch data from our backend API
 async function fetchWithProxies(URL) {
-	let lastError = null;
-	
-	// Try each proxy in sequence
-	for (let proxy of corsProxies) {
-		try {
-			const fullURL = proxy ? proxy + encodeURIComponent(URL) : URL;
-			console.log(`Trying to fetch with: ${proxy || 'direct fetch'}`);
-			
-			const response = await fetch(fullURL, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'text/html; charset=utf-8',
-					'Origin': window.location.origin,
-				},
-				// Add a reasonable timeout
-				signal: AbortSignal.timeout(10000) // 10 seconds timeout
-			});
-			
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
-			
-			return await response.text();
-		} catch (error) {
-			console.log(`${proxy || 'Direct fetch'} failed: ${error.message}`);
-			lastError = error;
-			// Continue to the next proxy
+	try {
+		// Map original URL to our new API endpoints
+		let apiEndpoint;
+		
+		if (URL.includes('abo-academi.ravintolapalvelut.iss.fi')) {
+			apiEndpoint = '/api/alexander';
+		} else if (URL.includes('cotton-club/vaasa')) {
+			apiEndpoint = '/api/cotton';
+		} else if (URL.includes('food-co-mathilda-cafe-oskar/vaasa')) {
+			apiEndpoint = '/api/mathilda';
+		} else if (URL.includes('august-restaurant/vaasa')) {
+			apiEndpoint = '/api/august';
+		} else {
+			throw new Error('Unknown restaurant URL');
 		}
+		
+		// Use either the deployed API or localhost in development
+		// For local development with live-server, which might run on different ports
+		const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+			? 'http://localhost:3000' 
+			: '';
+		
+		console.log(`Fetching from API: ${baseUrl}${apiEndpoint}`);
+		
+		const response = await fetch(`${baseUrl}${apiEndpoint}`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			signal: AbortSignal.timeout(10000) // 10 seconds timeout
+		});
+		
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		
+		const responseData = await response.json();
+		return responseData.data;  // The API returns { data: htmlContent }
+	} catch (error) {
+		console.error('API fetch failed:', error.message);
+		throw new Error(`Failed to fetch data: ${error.message}`);
 	}
-	
-	// If we've tried all proxies and none worked, throw the last error
-	throw new Error(`All methods failed to fetch data. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
 // Function to fetch and display the lunch for all restaurants
@@ -357,8 +368,31 @@ async function fetchLunch(URL, divId) {
 			lunchDiv.innerHTML = "<p>Noudetaan lounas-dataa...</p>";
 		}
 
-		// Try to fetch with multiple proxies
-		const data = await fetchWithProxies(URL);
+		// Try to fetch with retry logic
+		let retries = 0;
+		let data = null;
+		let lastError = null;
+
+		while (retries < API_CONFIG.retries && !data) {
+			try {
+				if (retries > 0) {
+					console.log(`Retrying fetch (${retries}/${API_CONFIG.retries})...`);
+					// Add a delay between retries
+					await new Promise(resolve => setTimeout(resolve, API_CONFIG.retryDelay));
+				}
+				data = await fetchWithProxies(URL);
+				break; // Success! Exit the retry loop
+			} catch (error) {
+				lastError = error;
+				retries++;
+				console.error(`Fetch attempt ${retries} failed:`, error.message);
+			}
+		}
+
+		// If all retries failed, throw the last error
+		if (!data) {
+			throw lastError || new Error('Failed to fetch data after multiple attempts');
+		}
 		
 		// Get reminder notes div
 		const reminderNotes = document.querySelectorAll('.lang-reminder');
