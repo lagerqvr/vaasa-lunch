@@ -13,7 +13,7 @@ const app = express();
 
 // Enable CORS for all routes
 app.use(cors({
-	origin: '*',  // Allow requests from any origin
+	origin: '*',
 	methods: ['GET'],
 	allowedHeaders: ['Content-Type', 'Authorization']
 }));

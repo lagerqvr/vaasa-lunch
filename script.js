@@ -330,7 +330,7 @@ async function fetchWithProxies(URL) {
 			? 'http://localhost:3000' 
 			: '';
 		
-		console.log(`Fetching from API: ${baseUrl}${apiEndpoint}`);
+		// console.log(`Fetching from API: ${baseUrl}${apiEndpoint}`);
 		
 		const response = await fetch(`${baseUrl}${apiEndpoint}`, {
 			method: 'GET',
@@ -398,10 +398,14 @@ async function fetchLunch(URL, divId) {
 		const reminderNotes = document.querySelectorAll('.lang-reminder');
 		lunchDiv.innerHTML = '';
 
-		// Get the updated preferred language
 		let openTxt;
 		let menuLinkTxt;
-		let restaurantUrl = URL;
+		let restaurantUrl;
+		if (URL === 'https://www.lounaat.info/lounas/cotton-club/vaasa') {
+			restaurantUrl = 'https://www.cotton-club.fi/ruokalista';
+		} else {
+			restaurantUrl = URL;
+		}
 
 		reminderNotes.forEach((reminderNote) => {
 			if (lang === 'en') {
@@ -451,13 +455,39 @@ async function fetchLunch(URL, divId) {
 		const isWeekend = (day === 'Sat' || day === 'Sun');
 
 		if (isWeekend) {
+		  const lunchTimeElement = document.createElement('div');
+		  
+		  lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
+			  <div class="col-8">
+				  <p class="openTxt"><b>${openTxt}</b><span class="text-secondary"> -</span></p>
+			  </div>
+			  <div class="col-4 d-flex justify-content-end">
+				  <a style="text-decoration: none;" class="menu-link" href="${restaurantUrl}">${menuLinkTxt}
+					  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
+						  class="bi bi-box-arrow-up-right mb-1 ml-1" viewBox="0 0 16 16">
+						  <path fill-rule="evenodd"
+							  d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
+						  <path fill-rule="evenodd"
+							  d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
+					  </svg>
+				  </a>
+			  </div>
+		  </div>`;
+		  
+		  lunchDiv.appendChild(lunchTimeElement);
+
+		  const noWeekendElement = document.createElement('p');
+		  noWeekendElement.style.marginTop = '8px';
+
 		  if (lang === 'en') {
-			lunchDiv.innerHTML = '<p>No lunch service on weekends.</p>';
+			noWeekendElement.textContent = 'No lunch service on weekends.';
 		  } else if (lang === 'sv-FI') {
-			lunchDiv.innerHTML = '<p>Ingen lunchservice under helgen.</p>';
+			noWeekendElement.textContent = 'Ingen lunchservice under helgen.';
 		  } else {
-			lunchDiv.innerHTML = '<p>Ei lounaspalvelua viikonloppuisin.</p>';
+			noWeekendElement.textContent = 'Ei lounaspalvelua viikonloppuisin.';
 		  }
+		  
+		  lunchDiv.appendChild(noWeekendElement);
 		  return;
 		}
 
@@ -502,17 +532,17 @@ async function fetchLunch(URL, divId) {
 			}
 		} else {
 			// Lounaat.info format (Cotton Club, Mathilda, August)
-			const regex = new RegExp(`<div class="item-header"><h3>[^<]*${dateFormatted}[^<]*</h3></div><div class="item-body"><ul>(.*?)</ul></div><div class="item-footer">`, 's');
+			const regex = new RegExp(`<div class="item-header"><h3>[^<]*${dateFormatted}[^<]*</h3></div><div class="item-body"><ul>(.*?)</ul></div>`, 's');
 			match = data.match(regex);
 			if (match && match[1]) {
 				menuItems = parseLounaatInfoMenu(match[1]);
+				console.log('Menu items:', menuItems);
 			}
 		}
 
+		const lunchTimeElement = document.createElement('div');
+		
 		if (menuItems.length > 0) {
-			const lunchTimeElement = document.createElement('div');
-			
-			// Generate the restaurant-specific header with open hours and menu link
 			lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
 				<div class="col-8">
 					<p class="openTxt"><b>${openTxt}</b><span class="text-success"> ${lunchTime}</span></p>
@@ -529,9 +559,28 @@ async function fetchLunch(URL, divId) {
 					</a>
 				</div>
 			</div>`;
-			
-			lunchDiv.appendChild(lunchTimeElement);
+		} else {
+			lunchTimeElement.innerHTML = `<div class="row d-flex justify-content-between">
+				<div class="col-8">
+					<p class="openTxt"><b>${openTxt}</b><span class="text-secondary"> -</span></p>
+				</div>
+				<div class="col-4 d-flex justify-content-end">
+					<a style="text-decoration: none;" class="menu-link" href="${restaurantUrl}">${menuLinkTxt}
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
+							class="bi bi-box-arrow-up-right mb-1 ml-1" viewBox="0 0 16 16">
+							<path fill-rule="evenodd"
+								d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
+							<path fill-rule="evenodd"
+								d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z" />
+						</svg>
+					</a>
+				</div>
+			</div>`;
+		}
+		
+		lunchDiv.appendChild(lunchTimeElement);
 
+		if (menuItems.length > 0) {
 			const menuParagraph = document.createElement('div');
 			menuParagraph.innerHTML = "<b>Lunch/lounas</b>:";
 			const menuList = document.createElement('ul');
@@ -553,13 +602,18 @@ async function fetchLunch(URL, divId) {
 			lunchDiv.appendChild(menuParagraph);
 
 		} else {
+			const noDataElement = document.createElement('p');
+			noDataElement.style.marginTop = '8px';
+			
 			if (lang === 'en') {
-				lunchDiv.innerHTML = '<p>No lunch data available for the selected day.</p>';
+				noDataElement.textContent = 'No lunch data available for the selected day.';
 			} else if (lang === 'sv-FI') {
-				lunchDiv.innerHTML = '<p>Ingen lunch-data kunde hämtas för dagen i frågan.</p>';
+				noDataElement.textContent = 'Ingen lunch-data kunde hämtas för dagen i frågan.';
 			} else {
-				lunchDiv.innerHTML = '<p>Lounas-dataa ei löytynyt kyseiselle päivälle.</p>';
+				noDataElement.textContent = 'Lounas-dataa ei löytynyt kyseiselle päivälle.';
 			}
+			
+			lunchDiv.appendChild(noDataElement);
 		}
 
 	} catch (error) {
@@ -701,6 +755,7 @@ function parseAlexanderMenu(menuText) {
 
 // Function to parse lounaat.info format menus (Cotton Club, Mathilda, August)
 function parseLounaatInfoMenu(menuText) {
+	console.log('Parsing menu text:', menuText);
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(menuText, 'text/html');
 	const menuItems = [];
