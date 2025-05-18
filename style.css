@@ -123,9 +123,17 @@ footer>a {
 	color: #9b0000; 
 }
 
+.menu-link:hover {
+	color: #500000;
+}
+
 /* Dark mode menu-link styling */
 [data-bs-theme="dark"] .menu-link {
 	color: #ff6b6b;
+}
+
+[data-bs-theme="dark"] .menu-link:hover {
+	color: #fc4545;
 }
 
 .openTxt {
