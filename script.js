@@ -688,12 +688,12 @@ const copyLunchToClipboard = () => {
 	}
 };
 
-document.querySelector('#collapseTwo').addEventListener('show.bs.collapse', function () {
-	fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
-});
-
 document.querySelector('#collapseOne').addEventListener('show.bs.collapse', function () {
 	fetchLunch(`https://www.lounaat.info/lounas/cotton-club/vaasa`, 'cotton-menu');
+});
+
+document.querySelector('#collapseTwo').addEventListener('show.bs.collapse', function () {
+	fetchLunch(`https://www.lounaat.info/lounas/august-restaurant/vaasa`, 'august-menu');
 });
 
 document.querySelector('#collapseThree').addEventListener('show.bs.collapse', function () {
@@ -701,7 +701,7 @@ document.querySelector('#collapseThree').addEventListener('show.bs.collapse', fu
 });
 
 document.querySelector('#collapseFour').addEventListener('show.bs.collapse', function () {
-	fetchLunch(`https://www.lounaat.info/lounas/food-co-mathilda-cafe-oskar/vaasa`, 'mathilda-menu');
+	fetchLunch(`https://abo-academi.ravintolapalvelut.iss.fi/abo-academi`, 'alexander-menu');
 });
 
 document.getElementById('copy-div').addEventListener('click', function () {
